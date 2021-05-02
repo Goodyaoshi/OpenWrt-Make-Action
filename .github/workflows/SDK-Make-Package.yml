@@ -1,0 +1,65 @@
+name: SDK-Make-Package
+
+
+on:
+  repository_dispatch:
+  workflow_dispatch:
+
+env:
+  SDK_URL: ${{ secrets.SDK_URL }}
+  SDK_NAME: ${{ secrets.SDK_NAME }}
+  PACKAGE_URL: ${{ secrets.PACKAGE_URL }}
+  BARK_URL: ${{ secrets.BARK_URL }}
+jobs:
+
+  Make:
+
+    name: SDK Make Package
+
+    runs-on: ubuntu-latest
+
+    if: github.event.repository.owner.id == github.event.sender.id
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@main
+
+      - name: 拉取SDK
+        run: |
+          wget -c $SDK_URL
+      - name: 解压
+        run: |
+          tar xvf *.tar.xz
+      - name: 更新和安装源
+        run: |
+          cd $SDK_NAME
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+      - name: 克隆软件包源码
+        run: |
+          cd $SDK_NAME
+          git clone $PACKAGE_URL package/mine
+      - name: 再次更新和安装源并且执行make defconfig
+        run: |
+          cd $SDK_NAME
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+          make defconfig
+      - name: 开始编译
+        run: |
+          cd $SDK_NAME
+          make package/mine/compile
+      - name: 准备ipk以及相应依赖
+        run: |
+          cd $SDK_NAME
+          mkdir -p ../artifact/bin
+          cp -pR ./bin/ ../artifact/bin/
+      - name: 上传ipk
+        uses: actions/upload-artifact@main
+        with:
+          name: package
+          path: ./artifact/bin/
+      - name: 发送通知
+        run: |
+          curl  $BARK_URL/SDK-Make-Package/编译完成，请登录github查看
